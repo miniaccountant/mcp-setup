@@ -1,0 +1,26 @@
+{
+  "name": "miniaccountant",
+  "description": "Official Mini Accountant plugins for Claude Code — connect Claude to your Mini Accountant workspace for invoicing, expenses, and accounting analytics.",
+  "owner": {
+    "name": "Mini Accountant",
+    "email": "support@miniaccountant.app"
+  },
+  "plugins": [
+    {
+      "name": "mini-accountant",
+      "source": "./",
+      "description": "Connect Claude to your Mini Accountant workspace: create and manage invoices, customers, expenses, services, and payment settings, and run analytics and tax estimates.",
+      "category": "productivity",
+      "tags": [
+        "accounting",
+        "invoicing",
+        "expenses",
+        "finance",
+        "vat",
+        "analytics",
+        "freelance",
+        "bookkeeping"
+      ]
+    }
+  ]
+}
