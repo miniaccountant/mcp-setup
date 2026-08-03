@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "app.miniaccountant/mini-accountant",
+  "title": "Mini Accountant",
+  "description": "Hosted MCP server for Mini Accountant: invoices, expenses, customers, analytics, tax estimates.",
+  "version": "1.0.0",
+  "websiteUrl": "https://ad.miniaccountant.app",
+  "repository": {
+    "url": "https://github.com/miniaccountant/mcp-setup",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.miniaccountant.app/v1beta"
+    }
+  ]
+}

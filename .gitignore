@@ -1,0 +1,6 @@
+# MCP Registry publishing — never commit secrets/tokens
+key.pem
+mcp-registry-auth
+.mcpregistry_registry_token
+.mcpregistry_*
+publish.sh
