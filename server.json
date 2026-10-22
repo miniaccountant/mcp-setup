@@ -14,5 +14,17 @@
       "type": "streamable-http",
       "url": "https://mcp.miniaccountant.app/v1beta"
     }
-  ]
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "authentication": {
+        "required": true,
+        "type": "oauth2.1",
+        "flow": "authorization_code+pkce",
+        "dynamicClientRegistration": true,
+        "apiKeyRequired": false,
+        "note": "User-scoped. Clients discover the endpoints via /.well-known/oauth-protected-resource; there is no API key and no anonymous access."
+      }
+    }
+  }
 }
