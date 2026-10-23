@@ -5,6 +5,18 @@
   "description": "Hosted MCP server for Mini Accountant: invoices, expenses, customers, analytics, tax estimates.",
   "version": "1.0.0",
   "websiteUrl": "https://ad.miniaccountant.app",
+  "icons": [
+    {
+      "src": "https://miniaccountant.app/icons/Icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    },
+    {
+      "src": "https://miniaccountant.app/icons/Icon-192.png",
+      "mimeType": "image/png",
+      "sizes": ["192x192"]
+    }
+  ],
   "repository": {
     "url": "https://github.com/miniaccountant/mcp-setup",
     "source": "github"
