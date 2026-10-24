@@ -1,5 +1,6 @@
 {
   "name": "mini-accountant",
+  "displayName": "Mini Accountant",
   "description": "Manage invoices, customers, expenses, services, and payment settings and run accounting analytics and tax estimates from Claude Code — powered by Mini Accountant's hosted MCP server.",
   "version": "1.0.0",
   "author": {
@@ -8,6 +9,9 @@
   },
   "homepage": "https://ad.miniaccountant.app",
   "repository": "https://github.com/miniaccountant/mcp-setup",
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/miniaccountant/mcp-setup#readme",
+  "privacyPolicyUrl": "https://ad.miniaccountant.app/privacy_policy",
   "keywords": [
     "mini-accountant",
     "mcp",
