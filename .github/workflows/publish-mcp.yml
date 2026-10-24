@@ -1,0 +1,78 @@
+name: Publish to MCP Registry
+
+# The registry does NOT read server.json out of this repository. Merging a change
+# to that file updates the file and nothing else: the published entry at
+# registry.modelcontextprotocol.io keeps whatever was last pushed to it with
+# `mcp-publisher publish`. This workflow is that push.
+#
+# Two ways to run it:
+#   * tag a release    — git tag v1.0.1 && git push origin v1.0.1
+#   * run it by hand   — Actions -> Publish to MCP Registry -> Run workflow,
+#                        optionally typing the version to publish as
+#
+# Either way the version in server.json is set from the tag/input before
+# publishing, so the file's version and the published version cannot drift.
+#
+# ONE-TIME SETUP, needed before the first run (see ops/human-only.md in the
+# sales repo for the copy-paste commands):
+#   1. an Ed25519 key pair, its public half in a TXT record on the APEX of
+#      miniaccountant.app — `v=MCPv1; k=ed25519; p=<public key>`
+#   2. the private half as the repository secret MCP_PRIVATE_KEY
+# The namespace in server.json is `app.miniaccountant/...`, the reverse-DNS form
+# of miniaccountant.app, so domain-based auth is the only method that can claim
+# it. GitHub OIDC cannot: that grants `io.github.*` namespaces only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish as (default: the version already in server.json)"
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Set the version to publish
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          elif [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/v}" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=""
+          fi
+          if [ -n "$VERSION" ]; then
+            jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          fi
+          echo "publishing version $(jq -r .version server.json)"
+
+      - name: Validate server.json before sending it
+        run: ./mcp-publisher validate
+
+      - name: Authenticate to MCP Registry
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: ./mcp-publisher login dns --domain miniaccountant.app --private-key "$MCP_PRIVATE_KEY"
+
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish
+
+      - name: Show what the registry now serves
+        run: |
+          sleep 5
+          curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=miniaccountant" | jq .
