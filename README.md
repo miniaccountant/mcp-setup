@@ -9,6 +9,12 @@ in once with your Mini Accountant account and your assistant acts on your behalf
 - **Transport:** streamable HTTP
 - **URL:** `https://mcp.miniaccountant.app/v1beta`
 - **Auth:** OAuth 2.1 / OIDC (Authorization Code + PKCE) — you'll be prompted to sign in.
+- **Sign-in required:** yes. The server is user-scoped, so there is a sign-in
+  step and no anonymous access. It needs a Mini Accountant account; the app is
+  free to download and its core features are free, with an optional in-app
+  subscription on top.
+- **Built for:** freelancers and small businesses, including ones billing in
+  more than one currency.
 
 ## What you can do
 
@@ -26,6 +32,31 @@ Once connected, the assistant can:
 
 Guided **skills** and **prompts** (e.g. "create an invoice") are also exposed so
 the assistant discovers the right workflow automatically.
+
+### Ask it things like
+
+- *"Invoice Acme for 12 hours of design work at €90 an hour."*
+- *"Log a €400 expense for the Berlin trip."*
+- *"What did I invoice last month, and how much VAT is on it?"*
+- *"Add a customer in the US who pays in dollars by bank transfer."*
+- *"Which invoices have no payment against them yet?"*
+- *"Estimate my tax for the third quarter."*
+
+The assistant works in your own Mini Accountant workspace — the same data the
+iOS, Android and web apps show.
+
+## What it doesn't do
+
+Worth stating plainly, because comparison tables tend to assume the opposite:
+
+- **No recurring or scheduled invoicing.** You can duplicate an existing invoice
+  in one step and the copy is dated today, which is the nearest equivalent.
+- **No double-entry bookkeeping and no audit trail.** This is invoicing, expenses
+  and reporting for a small business, not a general ledger.
+- **No payroll.**
+- **No statutory e-invoicing.** It does not file invoices into a national
+  e-invoicing regime, and it does not produce an accountant-facing export in a
+  national standard format.
 
 ---
 
