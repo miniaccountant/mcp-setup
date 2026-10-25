@@ -1,36 +1,47 @@
 name: Publish to MCP Registry
 
-# The registry does NOT read server.json out of this repository. Merging a change
-# to that file updates the file and nothing else: the published entry at
-# registry.modelcontextprotocol.io keeps whatever was last pushed to it with
-# `mcp-publisher publish`. This workflow is that push.
+# The registry does NOT read server.json from this repository. Merging a change to
+# that file changes the file and nothing else: the entry at
+# registry.modelcontextprotocol.io keeps whatever was last sent with
+# `mcp-publisher publish`. This workflow is that send, and the only one we use.
 #
-# Two ways to run it:
-#   * tag a release    — git tag v1.0.1 && git push origin v1.0.1
-#   * run it by hand   — Actions -> Publish to MCP Registry -> Run workflow,
-#                        optionally typing the version to publish as
+# The version published is the "version" in server.json - the file is the single
+# source of truth. Registry versions are immutable, so:
+#   * same version, same content      -> nothing to publish, the run succeeds
+#   * same version, different content -> the run fails: bump "version"
+#   * a version not in the registry   -> published
 #
-# Either way the version in server.json is set from the tag/input before
-# publishing, so the file's version and the published version cannot drift.
+# When it runs:
+#   * a push to main that changes server.json (i.e. a merged PR that bumped it)
+#   * Actions -> Publish to MCP Registry -> Run workflow. Safe to re-run any time:
+#     it always logs in (so it doubles as a check of the key and DNS record) and
+#     publishes only a version the registry does not have yet
+#   * a tag v<version>; it must equal server.json's version or the run fails
 #
-# ONE-TIME SETUP, needed before the first run (see ops/human-only.md in the
-# sales repo for the copy-paste commands):
-#   1. an Ed25519 key pair, its public half in a TXT record on the APEX of
-#      miniaccountant.app — `v=MCPv1; k=ed25519; p=<public key>`
-#   2. the private half as the repository secret MCP_PRIVATE_KEY
-# The namespace in server.json is `app.miniaccountant/...`, the reverse-DNS form
-# of miniaccountant.app, so domain-based auth is the only method that can claim
-# it. GitHub OIDC cannot: that grants `io.github.*` namespaces only.
+# Auth is the DNS method for the domain that owns the namespace in server.json
+# (dev.dudko/... -> dudko.dev, app.miniaccountant/... -> miniaccountant.app).
+# Reverse-DNS namespaces can only be claimed this way; GitHub OIDC grants
+# io.github.* only. One-time setup per domain:
+#   1. openssl genpkey -algorithm Ed25519 -out key.pem
+#   2. a TXT record on the APEX of the domain (not under _mcp-auth - the registry
+#      does not look there):
+#        v=MCPv1; k=ed25519; p=$(openssl pkey -in key.pem -pubout -outform DER | tail -c 32 | base64)
+#   3. the private half as the organization secret MCP_PRIVATE_KEY, with this
+#      repository given access to it. Either form works: the PEM file as is, or the
+#      hex seed mcp-publisher takes:
+#        openssl pkey -in key.pem -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n'
+#   then delete key.pem; never commit it.
 
 on:
   push:
+    branches: ["main"]
     tags: ["v*"]
+    paths: ["server.json"] # tag pushes ignore path filters
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to publish as (default: the version already in server.json)"
-        required: false
-        type: string
+
+concurrency:
+  group: publish-mcp-registry
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -41,38 +52,77 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Tag must equal the version in server.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(jq -r .version server.json)
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match server.json version $version. Bump server.json in a PR; the merge publishes it."
+            exit 1
+          fi
+
       - name: Install mcp-publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      - name: Set the version to publish
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-          elif [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/v}" ]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            VERSION=""
-          fi
-          if [ -n "$VERSION" ]; then
-            jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
-          fi
-          echo "publishing version $(jq -r .version server.json)"
-
-      - name: Validate server.json before sending it
+      - name: Validate server.json
         run: ./mcp-publisher validate
 
-      - name: Authenticate to MCP Registry
+      - name: Compare with the registry and npm
+        id: status
+        run: bash .github/scripts/registry-status.sh
+
+      - name: Log in to the registry (DNS, ${{ steps.status.outputs.domain }})
         env:
           MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
-        run: ./mcp-publisher login dns --domain miniaccountant.app --private-key "$MCP_PRIVATE_KEY"
+          DOMAIN: ${{ steps.status.outputs.domain }}
+        run: |
+          if [ -z "${MCP_PRIVATE_KEY//[[:space:]]/}" ]; then
+            echo "::error::MCP_PRIVATE_KEY is empty in this repository. It is an organization secret: Organization settings -> Secrets and variables -> Actions -> MCP_PRIVATE_KEY -> Repository access must include ${GITHUB_REPOSITORY}."
+            exit 1
+          fi
 
-      - name: Publish server to MCP Registry
+          # Accept the PEM file or the bare hex seed; mcp-publisher wants the hex seed.
+          if grep -q -- '-----BEGIN' <<<"$MCP_PRIVATE_KEY"; then
+            umask 077
+            printf '%s\n' "$MCP_PRIVATE_KEY" >"$RUNNER_TEMP/key.pem"
+            hex=$(openssl pkey -in "$RUNNER_TEMP/key.pem" -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n')
+            rm -f "$RUNNER_TEMP/key.pem"
+          else
+            hex=$(tr -d '[:space:]:' <<<"$MCP_PRIVATE_KEY" | tr '[:upper:]' '[:lower:]')
+          fi
+          echo "::add-mask::$hex"
+          if ! [[ $hex =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::MCP_PRIVATE_KEY is neither an Ed25519 PEM key nor a 64-character hex seed."
+            exit 1
+          fi
+
+          # The public half must be in a v=MCPv1 TXT record on the apex of the domain.
+          pub=$(python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))' "302e020100300506032b657004220420$hex" \
+            | openssl pkey -inform DER -pubout -outform DER | tail -c 32 | base64)
+          echo "public key from MCP_PRIVATE_KEY: $pub"
+          if records=$(dig +short TXT "$DOMAIN" 2>/dev/null) && grep -q 'v=MCPv1' <<<"$records"; then
+            if ! tr -d '"' <<<"$records" | grep -qF "p=$pub"; then
+              echo "::error::No TXT record on $DOMAIN matches MCP_PRIVATE_KEY. Expected: v=MCPv1; k=ed25519; p=$pub"
+              echo "Records found:"; grep 'v=MCPv1' <<<"$records"
+              exit 1
+            fi
+            echo "TXT record on $DOMAIN matches"
+          else
+            echo "::warning::Could not see a v=MCPv1 TXT record on $DOMAIN from the runner; the login below is the real check."
+          fi
+
+          ./mcp-publisher login dns --domain "$DOMAIN" --private-key "$hex"
+
+      - name: Publish ${{ steps.status.outputs.name }}@${{ steps.status.outputs.version }}
+        if: steps.status.outputs.state == 'new'
         run: ./mcp-publisher publish
 
       - name: Show what the registry now serves
+        if: steps.status.outputs.state == 'new'
+        env:
+          NAME: ${{ steps.status.outputs.name }}
+          VERSION: ${{ steps.status.outputs.version }}
         run: |
           sleep 5
-          curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=miniaccountant" | jq .
+          curl -fsS "https://registry.modelcontextprotocol.io/v0/servers/$(jq -rn --arg s "$NAME" '$s|@uri')/versions/$VERSION" | jq .
