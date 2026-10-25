@@ -3,7 +3,7 @@
   "name": "app.miniaccountant/mini-accountant",
   "title": "Mini Accountant",
   "description": "Invoicing, expenses, accounting analytics. OAuth 2.1 dynamic client registration, no API key.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "websiteUrl": "https://ad.miniaccountant.app",
   "icons": [
     {
