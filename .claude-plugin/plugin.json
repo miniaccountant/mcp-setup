@@ -2,7 +2,7 @@
   "name": "mini-accountant",
   "displayName": "Mini Accountant",
   "description": "Manage invoices, customers, expenses, services, and payment settings and run accounting analytics and tax estimates from Claude Code — powered by Mini Accountant's hosted MCP server.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Mini Accountant",
     "email": "support@miniaccountant.app"
