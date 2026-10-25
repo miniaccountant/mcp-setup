@@ -4,3 +4,7 @@ mcp-registry-auth
 .mcpregistry_registry_token
 .mcpregistry_*
 publish.sh
+
+# mcp-publisher binary when run locally
+/mcp-publisher
+/mcp-publisher_*.tar.gz

@@ -1,14 +1,27 @@
-name: Validate server.json
+name: Validate server.json and versions
+
+# Catches a forgotten version bump before it reaches main:
+#   * server.json must pass the registry schema
+#   * if the registry already has this version, server.json must be identical to
+#     it - otherwise "version" was not bumped (the publish on merge would fail)
+#   * a new version must be above the latest published one
+#   * npm-backed servers: packages[].version must exist on npm with mcpName set
+#   * pull requests: a change to the Claude Code plugin needs a new
+#     .claude-plugin/plugin.json "version", or installed users never get it
+# The weekly run also fails when npm has a newer release than server.json lists,
+# so a package release that never reached the registry does not go unnoticed.
 
 on:
   pull_request:
-    paths:
-      - "server.json"
-      - ".github/workflows/validate-server-json.yml"
   push:
     branches: ["main"]
     paths:
       - "server.json"
+      - ".claude-plugin/**"
+      - ".github/workflows/validate-server-json.yml"
+      - ".github/scripts/**"
+  schedule:
+    - cron: "23 6 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -19,10 +32,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install mcp-publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
       - name: Validate server.json against the schema it declares
         run: ./mcp-publisher validate
+
+      - name: server.json against the registry and npm
+        env:
+          DRIFT_IS_ERROR: ${{ github.event_name == 'schedule' }}
+        run: bash .github/scripts/registry-status.sh
+
+      - name: Plugin version bumped if the plugin changed
+        if: github.event_name == 'pull_request'
+        run: bash .github/scripts/plugin-version-check.sh "origin/${{ github.base_ref }}"
