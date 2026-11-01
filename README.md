@@ -10,9 +10,11 @@ in once with your Mini Accountant account and your assistant acts on your behalf
 - **URL:** `https://mcp.miniaccountant.app/v1beta`
 - **Auth:** OAuth 2.1 / OIDC (Authorization Code + PKCE) — you'll be prompted to sign in.
 - **Sign-in required:** yes. The server is user-scoped, so there is a sign-in
-  step and no anonymous access. It needs a Mini Accountant account; the app is
-  free to download and its core features are free, with an optional in-app
-  subscription on top.
+  step and no anonymous access. It needs a Mini Accountant account, and every
+  feature is free on iPhone, iPad, Android and the web. The optional Pro
+  subscription removes the "Powered by Mini Accountant" line from invoices and
+  reports; it does not unlock anything, so nothing the assistant can do here is
+  behind it.
 - **Built for:** freelancers and small businesses, including ones billing in
   more than one currency.
 
