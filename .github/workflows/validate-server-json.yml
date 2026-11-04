@@ -50,3 +50,20 @@ jobs:
       - name: Plugin version bumped if the plugin changed
         if: github.event_name == 'pull_request'
         run: bash .github/scripts/plugin-version-check.sh "origin/${{ github.base_ref }}"
+
+      # Every check above asks whether a field is PRESENT. This one asks whether
+      # two of our own published addresses AGREE, which is how a broken
+      # quickstart stayed invisible: from outside, a client discarding our
+      # protected-resource document looks exactly like the server being behind
+      # OAuth. Exit 2 is "could not look" and must not fail the build.
+      - name: OAuth discovery chain agrees with the published endpoint
+        run: |
+          set +e
+          bash .github/scripts/oauth-discovery-check.sh server.json
+          rc=$?
+          set -e
+          if [ "$rc" = "2" ]; then
+            echo "::warning::the OAuth discovery check could not reach part of the chain; nothing established either way."
+            exit 0
+          fi
+          exit $rc
