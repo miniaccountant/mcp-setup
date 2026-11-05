@@ -8,8 +8,14 @@ name: Validate server.json and versions
 #   * npm-backed servers: packages[].version must exist on npm with mcpName set
 #   * pull requests: a change to the Claude Code plugin needs a new
 #     .claude-plugin/plugin.json "version", or installed users never get it
+#   * the OAuth protected-resource document must name the SAME url server.json
+#     publishes - RFC 9728 3.3 makes a client discard it otherwise, and the
+#     quickstart then fails before the sign-in screen rather than at it
 # The weekly run also fails when npm has a newer release than server.json lists,
-# so a package release that never reached the registry does not go unnoticed.
+# so a package release that never reached the registry does not go unnoticed, and
+# it is where the OAuth metadata check is fatal: a server-side field is not
+# something a pull request can fix, so blocking every PR on it would only train
+# people to ignore the job.
 
 on:
   pull_request:
@@ -46,6 +52,11 @@ jobs:
         env:
           DRIFT_IS_ERROR: ${{ github.event_name == 'schedule' }}
         run: bash .github/scripts/registry-status.sh
+
+      - name: OAuth metadata agrees with server.json
+        env:
+          STRICT: ${{ github.event_name == 'schedule' }}
+        run: bash .github/scripts/oauth-metadata-check.sh
 
       - name: Plugin version bumped if the plugin changed
         if: github.event_name == 'pull_request'
